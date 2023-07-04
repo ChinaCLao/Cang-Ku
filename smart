@@ -1,0 +1,95 @@
+#include <iostream>
+#include<algorithm>
+#include <opencv2/opencv.hpp>
+using namespace std;
+using namespace cv;
+int main() 
+{
+
+    VideoCapture capture;
+    capture.open("/home/china-c/opencv/samples/cpp/example_cmake/Resources/ood_red.mp4");
+    Mat img1,gray,binary,img;
+    while (true) 
+    {
+        capture.read(img1);
+        resize(img1,img,Size(),0.5,0.5);
+        double start = getTickCount();
+        cvtColor(img, gray, COLOR_BGR2GRAY);
+        threshold(gray, binary, 128, 255, THRESH_BINARY);
+        imshow("Image Binary",binary);
+        Mat hsv; 
+        cvtColor(img, hsv, COLOR_BGR2HSV);
+        Scalar lower = Scalar(138,0,82);
+        Scalar upper = Scalar(179,100,255);
+        Mat mask;
+        inRange(hsv, lower, upper, mask);
+        vector<vector<Point>> contours;
+        findContours(mask, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+        vector<Rect> boundRect(contours.size());//外矩形
+      
+        int myPoints[boundRect.size()][3];
+        for(int i=0;i<contours.size();i++)
+        {
+           
+            boundRect[i] = boundingRect(contours[i]);
+
+            myPoints[i][0]=boundRect[i].x+boundRect[i].width/2;
+            myPoints[i][1]=boundRect[i].y+boundRect[i].height/2;
+            myPoints[i][2]=0;
+            
+        }
+        
+        int k=0,j;
+        for(int i=0;i<contours.size()-1;i++)
+        {
+            double len=100000000;
+            for(j=i+1;j<contours.size();j++)
+            {
+                if(myPoints[j][2]==0&&myPoints[i][2]==0)
+                {
+                    double s=(myPoints[j][0]-myPoints[i][0])*(myPoints[j][0]-myPoints[i][0])+(myPoints[j][1]-myPoints[i][1])*(myPoints[j][1]-myPoints[i][1]);
+                    if(s<len)
+                    {
+                        k=j;
+                        len=s;
+                    }
+                }
+            }
+            if(myPoints[k][2]==0&&myPoints[i][2]==0)
+            {
+                myPoints[i][2]=1;
+                myPoints[k][2]=1;
+                if((boundRect[i].x+boundRect[i].width)>(boundRect[k].x+boundRect[k].width))
+                {
+                    Rect A(boundRect[k].x,boundRect[k].y,boundRect[i].x+boundRect[i].width-boundRect[i].x,boundRect[k].y-boundRect[i].y+boundRect[i].height);
+                    if(A.area()<500) 
+                        if(boundRect[i].height+boundRect[k].height>A.height)
+                        rectangle(img, boundRect[k].tl(),boundRect[i].br(), Scalar(255, 0, 255), 2);
+                }
+                    
+                else 
+                {
+                    Rect A(boundRect[i].x,boundRect[i].y,boundRect[k].x+boundRect[k].width-boundRect[i].x,boundRect[i].y-boundRect[k].y+boundRect[k].height);
+                    if(A.area()<500) 
+                        if(boundRect[i].height+boundRect[k].height>A.height)
+                        rectangle(img, boundRect[i].tl(),boundRect[k].br(), Scalar(255, 0, 255), 2);
+                }
+            }
+            
+            k=0;
+        }
+
+        double end = getTickCount();
+        double freq = getTickFrequency();
+        double time_taken = (end - start) / freq;
+        double fps = 1.0 / time_taken;
+
+        stringstream s;
+         s << "FPS: "<< fps;
+        putText(img, s.str(), Point(30, 70), FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 255, 0), 2);
+        imshow("Image", img);
+        if(waitKey(20)==27)  break;
+    }
+    capture.release();
+    return 0;
+}
